@@ -16,11 +16,12 @@ export HOME := $(ROOT_DIR)/debian
 -include ${ROOT_DIR}/lib/jinterface/vsn.mk
 -include ${ROOT_DIR}/lib/ic/vsn.mk
 -include ${ROOT_DIR}/lib/tools/vsn.mk
+-include ${ROOT_DIR}/lib/webtool/vsn.mk
 -include ${ROOT_DIR}/lib/common_test/vsn.mk
 -include ${ROOT_DIR}/lib/snmp/vsn.mk
 -include ${ROOT_DIR}/lib/hipe/vsn.mk
 SOURCE_VERSION=$(shell dpkg-parsechangelog | sed -ne's!^Version: \(.*\)-.*!\1!p')
-ABI_VERSION=$(shell cat debian/control | sed -ne's!^Provides: erlang-abi-\([^ ,]*\).*!\1!p' | head -1)
+ABI_VERSION=$(shell cat debian/control | sed -ne's!^Provides: erlang-abi-\(.*\)!\1!p' | head -1)
 HIPE_ARCHES=$(shell cat debian/control | grep '^Architecture:' | egrep -v '(all|any)' | sed -e 's/^Architecture: *//')
 
 ifeq ($(findstring debug,$(DEB_BUILD_OPTIONS)),debug)
@@ -50,10 +51,8 @@ endif
 USE_CLOCK_GETTIME := $(shell echo ${DEB_HOST_ARCH} | egrep -c "bsd|hurd" | sed -es/1/no/ -es/0/yes/)
 ifeq ($(USE_CLOCK_GETTIME), no)
 CLOCK_GETTIME_OPT=
-SYSTEMD_OPT=
 else
 CLOCK_GETTIME_OPT=--enable-clock-gettime
-SYSTEMD_OPT=--enable-systemd
 endif
 
 # Temporary (until #475459 is fixed) disabling threads for sparc architecture
@@ -76,7 +75,7 @@ GEN_OPT_FLGS=-O2 -fno-strict-aliasing
 TYPE=
 endif
 
-JAVA_OPTIONS=-Xlint -source 1.7 -target 1.7
+JAVA_OPTIONS=-source 1.5 -target 1.5
 
 JOBS=4
 
@@ -102,7 +101,6 @@ clean:
 	for i in `find ${ROOT_DIR} -name 'config.sub~'` ; do \
 	    mv $$i $${i%%\~} ; \
 	done
-	rm -f lib/configure.in
 	#
 	# Remove files, which were generated from templates
 	for i in debian/*.in debian/scripts/*.in ; do \
@@ -163,8 +161,11 @@ automake-stamp:
 	done
 	#
 	# Regenerate configure scripts using autoconf
-	./otp_build autoconf
-	#
+	for i in `find ${ROOT_DIR} -not \( -wholename '*/.pc' -prune \) \
+				    -a -name 'configure.in' -printf "%h\n"`; do \
+	    echo "autoconf'ing $${i}"; \
+	    (cd $${i} && autoconf) \
+	done
 	touch automake-stamp
 
 configure-hipe: configure-hipe-stamp
@@ -187,15 +188,12 @@ configure-hipe-stamp: automake-stamp
 		    $(THREAD_OPTS) \
 		    --enable-hipe \
 		    $(KERNEL_POLL_OPT) \
-		    $(SYSTEMD_OPT) \
 		    --enable-sctp \
 		    $(CLOCK_GETTIME_OPT) \
 		    --enable-dynamic-ssl-lib \
-		    --with-ssl-rpath=no \
 		    --enable-ethread-pre-pentium4-compatibility \
 		    --enable-shared-zlib \
-		    --without-ssl-zlib \
-		    --disable-silent-rules
+		    --without-ssl-zlib
 	#
 	touch configure-hipe-stamp
 
@@ -219,15 +217,12 @@ configure-stnd-stamp: automake-stamp
 		    $(THREAD_OPTS) \
 		    --disable-hipe \
 		    $(KERNEL_POLL_OPT) \
-		    $(SYSTEMD_OPT) \
 		    --enable-sctp \
 		    $(CLOCK_GETTIME_OPT) \
 		    --enable-dynamic-ssl-lib \
-		    --with-ssl-rpath=no \
 		    --enable-ethread-pre-pentium4-compatibility \
 		    --enable-shared-zlib \
-		    --without-ssl-zlib \
-		    --disable-silent-rules
+		    --without-ssl-zlib
 	#
 	touch configure-stnd-stamp
 
@@ -285,13 +280,6 @@ define do-install
 		    $(INSTALL_DIR)/usr/lib/erlang/lib/hipe-$(HIPE_VSN)/$${subdir} ; \
 	    fi ; \
 	done
-
-	# Install systemd units for epmd
-	if [ "$(USE_CLOCK_GETTIME)" = "yes" ] ; then \
-	    install -m 755 -d $(INSTALL_DIR)/lib/systemd/system ; \
-	    install -m 644 debian/epmd.service $(INSTALL_DIR)/lib/systemd/system ; \
-	    install -m 644 debian/epmd.socket $(INSTALL_DIR)/lib/systemd/system ; \
-	fi
 endef
 
 # manpages builds section 1 manual pages
@@ -300,13 +288,13 @@ manpages-stamp: $(INSTALL_RULE)
 	dh_testdir
 	target=$$(basename $$(find make -type d |grep /)) ; \
 	PATH=$(ROOT_DIR)/bin:$$PATH ; \
-	for m in lib/diameter lib/snmp lib/dialyzer lib/erl_interface lib/common_test erts ; do \
+	for m in lib/diameter lib/snmp lib/dialyzer lib/erl_interface lib/common_test lib/webtool erts ; do \
 	    ${MAKE} -j ${JOBS} -C $$m/doc/src man ERL_TOP=$(ROOT_DIR) TARGET=$$target ; \
 	done
 	#
 	install -d $(MAN_DIR)/man1 $(MAN_DIR)/man3 ; \
 	install lib/dialyzer/doc/man3/*.3 $(MAN_DIR)/man3 ; \
-	for m in lib/diameter lib/snmp lib/erl_interface lib/common_test erts ; do \
+	for m in lib/diameter lib/snmp lib/erl_interface lib/common_test lib/webtool erts ; do \
 	    install $$m/doc/man1/*.1 $(MAN_DIR)/man1 ; \
 	done
 	#
@@ -314,6 +302,9 @@ manpages-stamp: $(INSTALL_RULE)
 	#
 	touch manpages-stamp
 
+# CC_R_FLAG and LD_R_FLAG are empty because Debian doesn't recommend
+# RPATH definition in binaries
+# CC_R_OPT is used in percept
 build-hipe: build-hipe-stamp
 build-hipe-stamp: configure-hipe-stamp
 	dh_testdir
@@ -375,6 +366,7 @@ build-stamp: $(INSTALL_RULE)
 	     	-e's/@EI_VSN@/$(EI_VSN)/g' \
 	     	-e's/@JINTERFACE_VSN@/$(JINTERFACE_VSN)/g' \
 	     	-e's/@IC_VSN@/$(IC_VSN)/g' \
+		-e's/@WEBTOOL_VSN@/$(WEBTOOL_VSN)/g' \
 		-e's/@COMMON_TEST_VSN@/$(COMMON_TEST_VSN)/g' \
 		-e's/@SNMP_VSN@/$(SNMP_VSN)/g' \
 		-e's/@DIAMETER_VSN@/$(DIAMETER_VSN)/g' \
@@ -452,8 +444,6 @@ binary-erlang-base: build-stamp
 	dh_installman -a -Nerlang-base-hipe
 	dh_installmenu -a -Nerlang-base-hipe
 	dh_link -a -Nerlang-base-hipe
-	dh_systemd_enable -a -Nerlang-base-hipe --no-enable
-	dh_systemd_start -a -Nerlang-base-hipe --no-start
 	dh_strip -a -Nerlang-base-hipe --dbg-package=erlang-dbg
 	dh_compress -a -Nerlang-base-hipe
 	dh_fixperms -a -Nerlang-base-hipe
@@ -486,8 +476,6 @@ binary-erlang-base-hipe: build-stamp
 	dh_installman -perlang-base-hipe
 	dh_installmenu -perlang-base-hipe
 	dh_link -perlang-base-hipe
-	dh_systemd_enable -perlang-base-hipe --no-enable
-	dh_systemd_start -perlang-base-hipe --no-start
 	dh_strip -perlang-base-hipe
 	dh_compress -perlang-base-hipe
 	dh_fixperms -perlang-base-hipe
@@ -501,23 +489,21 @@ binary-erlang-base-hipe: build-stamp
 
 binary: binary-indep binary-arch
 
-REL=19.2.1
-DEB_REL=$(REL)+dfsg
+REL=R16B03-1
+RELDIR=R16B03-1
+DEB_REL=16.b.3.1-dfsg
 
 get-orig-source:
 	CURDIR=`pwd` && TMPDIR=`mktemp -d /tmp/erlang.XXXXXX` && \
 	cd $$TMPDIR && \
-	wget -O - https://github.com/erlang/otp/archive/OTP-$(REL).tar.gz | tar -zx && \
-	(cd otp-OTP-$(REL) && \
-	 if ./otp_build save_bootstrap ; then \
-	    for f in `cat prebuilt.files` ; do rm -f $$f ; done \
-	 fi) && \
-	(cd otp-OTP-$(REL)/erts && autoheader) && \
-	(cd otp-OTP-$(REL)/lib/erl_interface && autoheader) && \
-	rm -rvf otp-OTP-$(REL)/lib/*/doc/standard/ && \
-	rm -rvf otp-OTP-$(REL)/lib/*/doc/archive/ && \
-	rm -rvf otp-OTP-$(REL)/lib/common_test/priv/*.js && \
-	tar -Jcf $$CURDIR/erlang_$(DEB_REL).orig.tar.xz otp-OTP-$(REL) && \
+	wget -O - http://www.erlang.org/download/otp_src_$(REL).tar.gz | tar -zx && \
+	(cd otp_src_$(RELDIR) && \
+	 ./otp_build save_bootstrap && \
+	 for f in `cat prebuilt.files` ; do rm -f $$f ; done) && \
+	rm -rvf otp_src_$(RELDIR)/lib/*/doc/standard/ && \
+	rm -rvf otp_src_$(RELDIR)/lib/*/doc/archive/ && \
+	rm -rvf otp_src_$(RELDIR)/lib/common_test/priv/*.js && \
+	tar -Jcf $$CURDIR/erlang_$(DEB_REL).orig.tar.xz otp_src_$(RELDIR) && \
 	rm -rf $$TMPDIR
 
 .PHONY: clean automake install build build-arch build-indep

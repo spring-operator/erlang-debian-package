@@ -5,15 +5,15 @@ a hack to remove them.
 
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -1080,6 +1080,7 @@
- 	rm -f *~ *.bak config.log config.status prebuilt.files ibin/*
+@@ -995,6 +995,7 @@
+ 	find . -type f -name SKIP -print | xargs $(RM)
  	cd erts && ERL_TOP=$(ERL_TOP) $(MAKE) clean
  	cd lib  && ERL_TOP=$(ERL_TOP) $(MAKE) clean BUILD_ALL=true
 +	$(MAKE) additional_clean
  
- distclean: clean
- 	find . -type f -name SKIP              -print | xargs $(RM)
-@@ -1121,3 +1122,206 @@
+ #
+ # Just wipe out emulator, not libraries
+@@ -1032,3 +1033,209 @@
  		|| $(MAKE) BOOTSTRAP_ROOT=$(BOOTSTRAP_ROOT) bootstrap_root_clean
  
  # ----------------------------------------------------------------------
@@ -32,6 +32,7 @@ a hack to remove them.
 +	rm -rf $(ERL_TOP)/bootstrap/lib/sasl
 +	rm -rf $(ERL_TOP)/bootstrap/lib/snmp
 +	rm -rf $(ERL_TOP)/bootstrap/lib/syntax_tools
++	rm -rf $(ERL_TOP)/bootstrap/lib/test_server
 +	rm -rf $(ERL_TOP)/bootstrap/lib/wx
 +	rm -rf $(ERL_TOP)/bootstrap/lib/xmerl
 +	rm -rf $(ERL_TOP)/bootstrap/target
@@ -167,8 +168,10 @@ a hack to remove them.
 +	rm -rf $(ERL_TOP)/lib/ssh/ebin/ssh_sftpd_file_api.beam
 +	rm -rf $(ERL_TOP)/lib/ssl/doc/man6/ssl.6
 +	rm -rf $(ERL_TOP)/lib/ssl/ebin/ssl_session_cache_api.beam
++	rm -rf $(ERL_TOP)/lib/test_server/src/configure
 +	rm -rf $(ERL_TOP)/lib/tools/c_src/$(TARGET)
 +	rm -rf $(ERL_TOP)/lib/tools/src/xref_parser.erl
++	rm -rf $(ERL_TOP)/lib/webtool/ebin/webtool.appup
 +	rm -rf $(ERL_TOP)/lib/wx/config.log
 +	rm -rf $(ERL_TOP)/lib/wx/config.mk
 +	rm -rf $(ERL_TOP)/lib/wx/c_src/$(TARGET)

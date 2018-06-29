@@ -1,4 +1,5 @@
 clean.patch
+rpath.patch
 gnu.patch
 sparc.patch
 man.patch
@@ -6,8 +7,6 @@ emacs.patch
 docs.patch
 java.patch
 hppa.patch
+powerpc.patch
 javascript.patch
-wx3.0-constants.patch
-beamload.patch
-x32.patch
-cve-2016-10253.patch
+CVE-2014-1693.patch
