@@ -1,3 +1,9 @@
+erlang (1:16.b.3.1-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- RabbitMQ Team <info@rabbitmq.com>  Fri, 29 Jun 2018 08:02:48 +0000
+
 erlang (1:16.b.3.1-dfsg-3) unstable; urgency=low
 
   * Fixed CVE-2014-1693 by checking if the user, file, directory names
