@@ -161,11 +161,8 @@ automake-stamp:
 	done
 	#
 	# Regenerate configure scripts using autoconf
-	for i in `find ${ROOT_DIR} -not \( -wholename '*/.pc' -prune \) \
-				    -a -name 'configure.in' -printf "%h\n"`; do \
-	    echo "autoconf'ing $${i}"; \
-	    (cd $${i} && autoconf) \
-	done
+	./otp_build autoconf
+	#
 	touch automake-stamp
 
 configure-hipe: configure-hipe-stamp
